@@ -1,5 +1,3 @@
-import time
-
 from sys import exit
 from os.path import getsize
 from operator import attrgetter
@@ -8,7 +6,7 @@ from collections import namedtuple, defaultdict
 
 class QueryRunner:
     """
-    A mini query runner that implements JOIN, ORDERBY, COUNTBY, 
+    A mini query runner that implements JOIN, ORDERBY, COUNTBY,
     TAKE, FROM and SELECT. JOIN is implemented using sort merge join and
     hash join.
     """
@@ -54,8 +52,8 @@ class QueryRunner:
                 rows = self._countby(rows, arg)
 
             elif action == "JOIN":
-                rows = self._join(rows, arg, self._hash_join)
-                # rows = self._join(rows, arg, self._merge_join)
+                # rows = self._join(rows, arg, self._hash_join)
+                rows = self._join(rows, arg, self._merge_join)
 
         return rows
 
@@ -395,9 +393,9 @@ class QueryRunner:
 
 if __name__ == "__main__":
 
-    # FROM city.csv JOIN country.csv CountryCode JOIN language.csv CountryCode ORDERBY CountryPop TAKE 20
-    # FROM city.csv JOIN country.csv CountryCode COUNTBY Continent ORDERBY count
-    # FROM country.csv SELECT CountryName,CountryPop,CountryCode TAKE 10
+    # FROM ./data/pokemon.csv JOIN ./data/stats.csv id JOIN ./data/legendary.csv id TAKE 10
+    # FROM ./data/pokemon.csv COUNTBY type1 ORDERBY count TAKE 5
+    # FROM ./data/pokemon.csv SELECT name,type1 TAKE 5
 
     qr = QueryRunner()
 
@@ -413,25 +411,3 @@ if __name__ == "__main__":
         except (EOFError, KeyboardInterrupt):
             print("")
             exit(0)
-
-    # -----------------
-    #   join runtime
-    # -----------------
-
-    # merge_join: 153.7479305267334 ms
-    # hash_join: 131.60841941833496 ms
-    # city.csv 4079 rows, country.csv 239 rows, language.csv 984 rows
-
-    # qr = QueryRunner()
-    # query = 'FROM city.csv JOIN language.csv CountryCode'
-
-    # rt = 0
-
-    # for _ in range(50):
-    #     start_time = time.time()
-    #     out = qr.run_query(query)
-    #     end_time = time.time()
-
-    #     rt += (end_time - start_time) * 1000
-
-    # print(f'avg time per join: {rt/50} ms')
