@@ -100,7 +100,7 @@ def write_random_df(n_rows, col_names, write_pth):
     write to write_pth.
     """
     df = pd.DataFrame(
-        data=np.random.rand(n_rows, len(col_names),
+        data=np.random.rand(n_rows, len(col_names)),
         columns=col_names
     )
     df.reset_index(inplace=True)
