@@ -6,12 +6,25 @@ Specifically:
 - JOIN: offers inner join using [Hash Join](https://en.wikipedia.org/wiki/Hash_join#Classic_hash_join) and [Sort-Merge Join](https://www.youtube.com/watch?v=jiWCPJtDE2c). See speed comparison at the end.
 - COUNTBY: equivalent to `COUNT(*) ... GROUPBY <col>`, appends column `count`.
 
+The client and query runner server communicate through sockets. The message consists of:
+- header (4 bytes, big endian): integer representing the size of body
+- body: byte string (query or query output)
+
 ## 1. Run
 
-```python
-python3 query_runner.py
+In one terminal, start the server:
 ```
-starts an interactive shell where you can type in your query. The query should be a single line. Hit enter to print records retrieved.
+python3 server.py -port <port_number>
+```
+
+In a new terminal, start the client:
+```
+python3 query_runner_client.py -host 127.0.0.1 -port <port_number>
+```
+
+The client starts an interactive shell where you 
+can type in your query. The query should be a single line. 
+Hit enter to print records retrieved.
 
 ## 2. Query Syntax
 
@@ -55,7 +68,7 @@ Data in `./data` is from [Pokemon - Weedle's Cave](https://www.kaggle.com/termin
 
 ### 3.1 Multiple JOINs
 ```
-FROM ./data/pokemon.csv JOIN ./data/stats.csv id JOIN ./data/legendary.csv id TAKE 3
+FROM ../data/pokemon.csv JOIN ../data/stats.csv id JOIN ../data/legendary.csv id TAKE 3
 ```
 Output:
 ```
@@ -67,7 +80,7 @@ id,name,type1,type2,hp,attack,defense,special_attack,special_defence,speed,gener
 
 ### 3.2 COUNTBY, ORDERBY, TAKE 
 ```
-FROM ./data/pokemon.csv COUNTBY type1 ORDERBY count TAKE 5
+FROM ../data/pokemon.csv COUNTBY type1 ORDERBY count TAKE 5
 ```
 Output:
 ```
@@ -120,9 +133,9 @@ write_random_df(
 )
 ```
 
-Below query is run 50 times for each algorithm:
+Below query is run 50 times for each algorithm using `src/query_runner.py`:
 ```
-FROM ./data/dummy_1.csv JOIN ./data/dummy_2.csv index
+FROM ../data/dummy_1.csv JOIN ../data/dummy_2.csv index
 ```
 
 On average, hash join took 167.6 ms to complete the query, with an standard deviation of 57.6 ms. Sort merge join took 215.67 ms, with an standard deviation of 70.1 ms. A Mann Whitney U test shows that this difference in speed is statistically significant.
