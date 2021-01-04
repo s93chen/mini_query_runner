@@ -1,5 +1,6 @@
 from os.path import getsize
 from operator import attrgetter
+from typing import List, Tuple, Callable
 from collections import namedtuple, defaultdict
 
 
@@ -10,11 +11,11 @@ class QueryRunner:
     hash join.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.data_loaded = dict()
         self.keywords = {"FROM", "SELECT", "TAKE", "ORDERBY", "COUNTBY", "JOIN"}
 
-    def run_query(self, query_str):
+    def run_query(self, query_str: str) -> str:
         """
         Param:
             query_str: string type, input query to run
@@ -29,7 +30,7 @@ class QueryRunner:
 
         source_file = query_steps[0][1]
         rows, err = self._load_data(source_file)
-        
+
         if not rows:
             return err
 
@@ -65,7 +66,9 @@ class QueryRunner:
 
         return self._rows_to_string(rows)
 
-    def _select(self, rows, cols):
+    def _select(
+        self, rows: List[namedtuple], cols: List[str]
+    ) -> Tuple[List[namedtuple], str]:
         """
         Param:
             rows: list of namedtuples as input data
@@ -83,7 +86,9 @@ class QueryRunner:
         Row = namedtuple("Row", cols)
         return [Row(*[getattr(r, c) for c in cols]) for r in rows], ""
 
-    def _take(self, rows, num_rows):
+    def _take(
+        self, rows: List[namedtuple], num_rows: int
+    ) -> List[namedtuple]:
         """
         Param:
             rows: list of namedtuples as input data
@@ -97,7 +102,9 @@ class QueryRunner:
 
         return rows[:num_rows]
 
-    def _orderby(self, rows, order_col, reverse):
+    def _orderby(
+        self, rows: List[namedtuple], order_col: str, reverse: bool
+    ) -> List[namedtuple]:
         """
         Param:
             rows: list of namedtuples as input data
@@ -108,8 +115,18 @@ class QueryRunner:
         """
         return sorted(rows, key=attrgetter(order_col), reverse=reverse)
 
-    def _countby(self, rows, count_col):
-
+    def _countby(
+        self, rows: List[namedtuple], count_col: str
+    ) -> List[namedtuple]:
+        """
+        Param:
+            rows: list of namedtuples as input data
+            count_col: string, column to group by
+        Returns:
+            list of named tuples with new attribute
+            'count', representing number of elements
+            within each group.
+        """
         count_dict = defaultdict(int)
         Row = namedtuple("Row", [count_col, "count"])
 
@@ -118,7 +135,10 @@ class QueryRunner:
 
         return [Row(k, v) for k, v in count_dict.items()]
 
-    def _join(self, left_rows, join_args, join_fcn):
+    def _join(
+        self, left_rows: List[namedtuple], join_args: Tuple,
+        join_fcn: Callable[[List[namedtuple], List[namedtuple], str], Tuple[List[namedtuple], str]]
+    ) -> Tuple[List[namedtuple], str]:
         """
         Wrapper function for join implementation of choice.
 
@@ -130,7 +150,7 @@ class QueryRunner:
             list of namedtuples
         """
         right_rows, err = self._load_data(join_args[0])
-        
+
         if not right_rows:
             return [], err
 
@@ -138,7 +158,10 @@ class QueryRunner:
 
         return join_fcn(left_rows, right_rows, join_col)
 
-    def _get_joined_cols(self, left_rows, right_rows, join_col):
+    def _get_joined_cols(
+        self, left_rows: List[namedtuple],
+        right_rows: List[namedtuple], join_col: str
+    ) -> List[str]:
         """
         Helper function for joining functions - get list
         of column names for the joining output.
@@ -155,7 +178,10 @@ class QueryRunner:
 
         return left_cols + right_cols
 
-    def _hash_join(self, left_rows, right_rows, join_col):
+    def _hash_join(
+        self, left_rows: List[namedtuple],
+        right_rows: List[namedtuple], join_col: str
+    ) -> Tuple[List[namedtuple], str]:
         """
         Reference:
             https://en.wikipedia.org/wiki/Hash_join#Classic_hash_join
@@ -204,7 +230,10 @@ class QueryRunner:
 
         return output, ""
 
-    def _merge_join(self, left_rows, right_rows, join_col):
+    def _merge_join(
+        self, left_rows: List[namedtuple], 
+        right_rows: List[namedtuple], join_col: str
+    ) -> Tuple[List[namedtuple], str]:
         """
         Nice lecture on sort merge join:
             https://www.youtube.com/watch?v=jiWCPJtDE2c
@@ -268,7 +297,7 @@ class QueryRunner:
 
         return join_output, ""
 
-    def _parse_and_infer_schema(self, row):
+    def _parse_and_infer_schema(self, row: str) -> List[str]:
         """
         param:
             row: string, a line of input data
@@ -280,7 +309,7 @@ class QueryRunner:
         r = row.rstrip().split(",")
         return [eval(t) if t.isnumeric() else t for t in r]
 
-    def _load_data(self, file_name):
+    def _load_data(self, file_name: str) -> Tuple[List[namedtuple], str]:
         """
         Loads data given csv file name
         param:
@@ -316,7 +345,7 @@ class QueryRunner:
         except Exception as err:
             return [], err.args[1]
 
-    def _parse_query(self, query_str):
+    def _parse_query(self, query_str: str) -> Tuple[List[List[str]], str]:
         """
         Parse and validate input query string.
         Returns list of lists, where each list is in the form:
@@ -340,8 +369,7 @@ class QueryRunner:
             cur_action = tokens[act_idx]
 
             if cur_action not in self.keywords:
-                print(f"Invalid input at {act_idx + 1}th token")
-                return
+                return [], f"Invalid input at {act_idx + 1}th token"
 
             elif cur_action == "JOIN":
                 arg_1 = tokens[arg_idx]
@@ -360,7 +388,7 @@ class QueryRunner:
                 cur_arg = tokens[arg_idx]
 
                 if cur_arg in self.keywords:
-                    return [], f"Missing {cur_action} argument" 
+                    return [], f"Missing {cur_action} argument"
 
                 if cur_action == "TAKE":
                     if not cur_arg.isnumeric():
@@ -375,13 +403,13 @@ class QueryRunner:
 
         return query_steps, ""
 
-    def _rows_to_string(self, output):
-        if not output:
+    def _rows_to_string(self, rows: List[namedtuple]) -> str:
+        if not rows:
             return "No data returned."
 
-        output_str = ",".join(output[0]._fields) + "\n"
+        output_str = ",".join(rows[0]._fields) + "\n"
 
-        for row in output:
+        for row in rows:
             row = ",".join(str(r) for r in row) + "\n"
             output_str += row
 
@@ -390,21 +418,21 @@ class QueryRunner:
 
 # if __name__ == "__main__":
 
-# FROM ../data/pokemon.csv JOIN ../data/stats.csv id JOIN ../data/legendary.csv id TAKE 10
-# FROM ../data/pokemon.csv COUNTBY type1 ORDERBY count TAKE 5
-# FROM ../data/pokemon.csv SELECT name,type1 TAKE 5
+    # FROM ../data/pokemon.csv JOIN ../data/stats.csv id JOIN ../data/legendary.csv id TAKE 10
+    # FROM ../data/pokemon.csv COUNTBY type1 ORDERBY count TAKE 5
+    # FROM ../data/pokemon.csv SELECT name,type1 TAKE 5
 
-# qr = QueryRunner()
+    # qr = QueryRunner()
 
-# while 1:
-#     try:
-#         query = input("> ")
-#         out = qr.run_query(query)
-#         qr.print_output(out)
+    # while 1:
+    #     try:
+    #         query = input("> ")
+    #         out = qr.run_query(query)
+    #         qr.print_output(out)
 
-#     # exits nicely at ctrl-D (sends an End-of-File signal)
-#     # or at ctrl-C (sends terminate signal)
+    #     # exits nicely at ctrl-D (sends an End-of-File signal)
+    #     # or at ctrl-C (sends terminate signal)
 
-#     except (EOFError, KeyboardInterrupt):
-#         print("")
-#         exit(0)
+    #     except (EOFError, KeyboardInterrupt):
+    #         print("")
+    #         exit(0)
