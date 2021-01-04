@@ -1,4 +1,3 @@
-from sys import exit
 from os.path import getsize
 from operator import attrgetter
 from collections import namedtuple, defaultdict
@@ -23,13 +22,16 @@ class QueryRunner:
             query result newline-delimited string
         """
 
-        query_steps = self._parse_query(query_str)
+        query_steps, err = self._parse_query(query_str)
 
         if not query_steps:
-            return
+            return err
 
         source_file = query_steps[0][1]
-        rows = self._load_data(source_file)
+        rows, err = self._load_data(source_file)
+        
+        if not rows:
+            return err
 
         for i in range(1, len(query_steps)):
 
@@ -40,7 +42,10 @@ class QueryRunner:
             arg = query_steps[i][1]
 
             if action == "SELECT":
-                rows = self._select(rows, arg)
+                rows, err = self._select(rows, arg)
+
+                if not rows:
+                    return err
 
             elif action == "TAKE":
                 rows = self._take(rows, arg)
@@ -52,8 +57,11 @@ class QueryRunner:
                 rows = self._countby(rows, arg)
 
             elif action == "JOIN":
-                # rows = self._join(rows, arg, self._hash_join)
-                rows = self._join(rows, arg, self._merge_join)
+                rows, err = self._join(rows, arg, self._hash_join)
+                # rows, err = self._join(rows, arg, self._merge_join)
+
+                if not rows:
+                    return err
 
         return self._rows_to_string(rows)
 
@@ -63,17 +71,17 @@ class QueryRunner:
             rows: list of namedtuples as input data
             cols: list of strings as column names to select
         Returns:
-            list of namedtuples with specified columns only
+            output: list of namedtuples with specified columns only
+            error_msg: string specifying the error
         """
         cols = cols.rstrip().split(",")
 
         for c in cols:
             if c not in rows[0]._fields:
-                print(f"column {c} does not exist")
-                return
+                return [], f"column {c} does not exist"
 
         Row = namedtuple("Row", cols)
-        return [Row(*[getattr(r, c) for c in cols]) for r in rows]
+        return [Row(*[getattr(r, c) for c in cols]) for r in rows], ""
 
     def _take(self, rows, num_rows):
         """
@@ -121,7 +129,11 @@ class QueryRunner:
         returns:
             list of namedtuples
         """
-        right_rows = self._load_data(join_args[0])
+        right_rows, err = self._load_data(join_args[0])
+        
+        if not right_rows:
+            return [], err
+
         join_col = join_args[1]
 
         return join_fcn(left_rows, right_rows, join_col)
@@ -190,7 +202,7 @@ class QueryRunner:
                     join_val.update(big_row._asdict())
                     output.append(JoinRow(**join_val))
 
-        return output
+        return output, ""
 
     def _merge_join(self, left_rows, right_rows, join_col):
         """
@@ -254,7 +266,7 @@ class QueryRunner:
                 left_cur += 1
                 mark = None
 
-        return join_output
+        return join_output, ""
 
     def _parse_and_infer_schema(self, row):
         """
@@ -274,7 +286,8 @@ class QueryRunner:
         param:
             file_name: string
         returns:
-            list of namedtuples
+            output: list of namedtuples
+            error_msg: string specifying why loading failed
         """
         try:
             if file_name in self.data_loaded:
@@ -282,8 +295,7 @@ class QueryRunner:
 
             else:
                 if not getsize(file_name):
-                    print("Empty file")
-                    return
+                    return [], "Empty file"
 
                 with open(file_name, "r") as f:
 
@@ -295,16 +307,14 @@ class QueryRunner:
                     data = [Row(*self._parse_and_infer_schema(row)) for row in f]
 
                 if not data:
-                    print("Empty file")
-                    return
+                    return [], "Empty file"
 
                 self.data_loaded[file_name] = data
 
-            return data
+            return data, ""
 
         except Exception as err:
-            print(err.args[1])
-            return
+            return [], err.args[1]
 
     def _parse_query(self, query_str):
         """
@@ -315,12 +325,10 @@ class QueryRunner:
         tokens = query_str.split()
 
         if not tokens:
-            print("No query entered")
-            return
+            return [], "No query entered"
 
         if tokens[0] != "FROM":
-            print("Missing data source")
-            return
+            return [], "Missing data source"
 
         query_steps = []
 
@@ -340,12 +348,10 @@ class QueryRunner:
                 arg_2 = tokens[arg_idx + 1]
 
                 if (arg_1 in self.keywords) or (arg_2 in self.keywords):
-                    print(f"Missing JOIN argument at {act_idx + 1}th token")
-                    return
+                    return [], f"Missing JOIN argument at {act_idx + 1}th token"
 
                 if ".csv" not in arg_1:
-                    print(f"Missing JOIN table at {act_idx + 1}th token")
-                    return
+                    return [], f"Missing JOIN table at {act_idx + 1}th token"
 
                 cur_arg = (arg_1, arg_2)
                 act_idx = arg_idx + 2
@@ -354,13 +360,11 @@ class QueryRunner:
                 cur_arg = tokens[arg_idx]
 
                 if cur_arg in self.keywords:
-                    print(f"Missing {cur_action} argument")
-                    return
+                    return [], f"Missing {cur_action} argument" 
 
                 if cur_action == "TAKE":
                     if not cur_arg.isnumeric():
-                        print("TAKE requires integer input")
-                        return
+                        return [], "TAKE requires integer input"
 
                     cur_arg = int(cur_arg)
 
@@ -369,7 +373,7 @@ class QueryRunner:
             query_steps.append([cur_action, cur_arg])
             arg_idx = act_idx + 1
 
-        return query_steps
+        return query_steps, ""
 
     def _rows_to_string(self, output):
         if not output:
@@ -382,6 +386,7 @@ class QueryRunner:
             output_str += row
 
         return output_str
+
 
 # if __name__ == "__main__":
 
