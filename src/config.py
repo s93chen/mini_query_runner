@@ -1,0 +1,3 @@
+HEADER_SIZE = 4
+BYTE_ORDER = "big"
+ENCODING = "utf-8"
