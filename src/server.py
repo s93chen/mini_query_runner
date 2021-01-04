@@ -32,7 +32,6 @@ if __name__ == "__main__":
                         print(msg)
 
                         output = query_engine.run_query(msg)
-                        output = query_engine.rows_to_string(output)
                         utl.send_msg(output, conn)
 
                     else:

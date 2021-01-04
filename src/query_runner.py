@@ -20,7 +20,7 @@ class QueryRunner:
         Param:
             query_str: string type, input query to run
         Returns:
-            query result in form of list of namedtuples
+            query result newline-delimited string
         """
 
         query_steps = self._parse_query(query_str)
@@ -55,38 +55,7 @@ class QueryRunner:
                 # rows = self._join(rows, arg, self._hash_join)
                 rows = self._join(rows, arg, self._merge_join)
 
-        return rows
-
-    def print_output(self, output):
-        """
-        Prints query output in required form
-        Param:
-            output: list of namedtuples
-        """
-        try:
-            if not output:
-                print("No data returned")
-
-            else:
-                print(",".join(output[0]._fields))
-                for row in output:
-                    print(",".join(str(r) for r in row))
-
-        except Exception:
-            for i in output:
-                print(i)
-
-    def rows_to_string(self, output):
-        if not output:
-            return "No data returned."
-
-        output_str = ",".join(output[0]._fields) + "\n"
-
-        for row in output:
-            row = ",".join(str(r) for r in row) + "\n"
-            output_str += row
-
-        return output_str
+        return self._rows_to_string(rows)
 
     def _select(self, rows, cols):
         """
@@ -402,6 +371,17 @@ class QueryRunner:
 
         return query_steps
 
+    def _rows_to_string(self, output):
+        if not output:
+            return "No data returned."
+
+        output_str = ",".join(output[0]._fields) + "\n"
+
+        for row in output:
+            row = ",".join(str(r) for r in row) + "\n"
+            output_str += row
+
+        return output_str
 
 # if __name__ == "__main__":
 
